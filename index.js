@@ -6,7 +6,7 @@ const app = express();
 
 app.use(cors());
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.get("/api/classify", async (req, res) => {
   const name = req.query.name;
