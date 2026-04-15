@@ -11,28 +11,21 @@ const PORT = process.env.PORT || 3000;
 app.get("/api/classify", async (req, res) => {
   const name = req.query.name;
 
-  if (!name || name.trim() === "") {
+  if (!name || typeof name !== "string" || name.trim() === "") {
     return res.status(400).json({
       status: "error",
       message: "Name is required",
     });
   }
 
-  if (typeof name !== "string") {
-    return res.status(422).json({
-      status: "error",
-      message: "Name must be a string",
-    });
-  }
-
   try {
     const response = await axios.get(
-      `https://api.genderize.io/?name=${name}`
+      `https://api.genderize.io?name=${encodeURIComponent(name)}`
     );
 
     const data = response.data;
 
-    if (data.gender === null || data.count === 0) {
+    if (!data || data.gender === null || data.count === 0) {
       return res.status(422).json({
         status: "error",
         message: "No prediction available for the provided name",
@@ -40,8 +33,8 @@ app.get("/api/classify", async (req, res) => {
     }
 
     const gender = data.gender;
-    const probability = data.probability;
-    const sample_size = data.count;
+    const probability = Number(data.probability) || 0;
+    const sample_size = Number(data.count) || 0;
 
     const is_confident =
       probability >= 0.7 && sample_size >= 100;
@@ -60,9 +53,11 @@ app.get("/api/classify", async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("ERROR:", error.message);
+
     return res.status(500).json({
       status: "error",
-      message: "Internal server error",
+      message: error.message,
     });
   }
 });
