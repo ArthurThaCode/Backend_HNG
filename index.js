@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
@@ -13,7 +15,15 @@ const PORT = process.env.PORT || 3000;
 
 // Configuration Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error(
+    "Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_ANON_KEY (or SUPABASE_SERVICE_ROLE_KEY) in your environment."
+  );
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Fonction pour déterminer le groupe d'âge
