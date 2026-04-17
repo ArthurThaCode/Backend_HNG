@@ -1,6 +1,6 @@
-# Gender Classification API
+# Profile Intelligence Service
 
-A simple API that classifies names by gender using the Genderize.io API.
+A backend API that enriches names using external APIs (Genderize, Agify, Nationalize) and stores profiles in Supabase.
 
 ## Setup
 
@@ -9,38 +9,56 @@ npm install
 npm start
 ```
 
-## API Endpoint
+Set environment variables: `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
-**GET `/api/classify?name=John`**
+## API Endpoints
 
-### Success Response
+### POST `/api/profiles`
+Create or retrieve a profile.
+
+**Request:**
+```json
+{
+  "name": "john"
+}
+```
+
+**Response:**
 ```json
 {
   "status": "success",
   "data": {
-    "name": "John",
+    "id": "uuid",
+    "name": "john",
     "gender": "male",
-    "probability": 0.99,
+    "gender_probability": 0.99,
     "sample_size": 1234,
-    "is_confident": true,
-    "processed_at": "2026-04-15T12:00:00Z"
+    "age": 25,
+    "age_group": "adult",
+    "country_id": "US",
+    "country_probability": 0.85,
+    "created_at": "2026-04-17T10:00:00Z"
   }
 }
 ```
 
-### Error Response
+### GET `/api/profiles/{id}`
+Retrieve a profile by ID.
+
+**Response:**
 ```json
 {
-  "status": "error",
-  "message": "Name is required"
+  "status": "success",
+  "data": { ... }
 }
 ```
 
 ## Requirements
 
 - Node.js
-- Dependencies: express, axios, cors
+- Supabase account
+- Dependencies: express, axios, cors, @supabase/supabase-js, uuid
 
 ## Deployment
 
-Deploy to any Node.js hosting
+Deploy to Railway or any Node.js hosting with environment variables.

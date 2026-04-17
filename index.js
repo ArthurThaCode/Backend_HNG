@@ -1,15 +1,32 @@
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
+const { createClient } = require("@supabase/supabase-js");
+const { v7: uuidv7 } = require("uuid");
 
 const app = express();
 
 app.use(cors());
+app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-app.get("/api/classify", async (req, res) => {
-  const name = req.query.name;
+// Configuration Supabase
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Fonction pour déterminer le groupe d'âge
+function getAgeGroup(age) {
+  if (age <= 12) return "child";
+  if (age <= 19) return "teenager";
+  if (age <= 59) return "adult";
+  return "senior";
+}
+
+// POST /api/profiles
+app.post("/api/profiles", async (req, res) => {
+  const { name } = req.body;
 
   if (!name || typeof name !== "string" || name.trim() === "") {
     return res.status(400).json({
@@ -19,42 +36,116 @@ app.get("/api/classify", async (req, res) => {
   }
 
   try {
-    const response = await axios.get(
-      `https://api.genderize.io?name=${encodeURIComponent(name)}`
-    );
+    // Vérifier si le profil existe déjà
+    const { data: existingProfile, error: selectError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("name", name.trim())
+      .single();
 
-    const data = response.data;
+    if (selectError && selectError.code !== "PGRST116") {
+      throw selectError;
+    }
 
-    if (!data || data.gender === null || data.count === 0) {
-      return res.status(422).json({
-        status: "error",
-        message: "No prediction available for the provided name",
+    if (existingProfile) {
+      return res.status(200).json({
+        status: "success",
+        message: "Profile already exists",
+        data: existingProfile,
       });
     }
 
-    const gender = data.gender;
-    const probability = Number(data.probability) || 0;
-    const sample_size = Number(data.count) || 0;
+    // Appeler les APIs
+    const [genderizeRes, agifyRes, nationalizeRes] = await Promise.all([
+      axios.get(`https://api.genderize.io?name=${encodeURIComponent(name)}`),
+      axios.get(`https://api.agify.io?name=${encodeURIComponent(name)}`),
+      axios.get(`https://api.nationalize.io?name=${encodeURIComponent(name)}`),
+    ]);
 
-    const is_confident =
-      probability >= 0.7 && sample_size >= 100;
+    const genderize = genderizeRes.data;
+    const agify = agifyRes.data;
+    const nationalize = nationalizeRes.data;
 
-    const processed_at = new Date().toISOString();
+    // Traiter les données
+    const gender = genderize.gender;
+    const gender_probability = genderize.probability;
+    const sample_size = genderize.count;
 
-    return res.json({
+    const age = agify.age;
+    const age_group = getAgeGroup(age);
+
+    const countries = nationalize.country || [];
+    const topCountry = countries.sort((a, b) => b.probability - a.probability)[0];
+    const country_id = topCountry ? topCountry.country_id : null;
+    const country_probability = topCountry ? topCountry.probability : null;
+
+    // Créer le profil
+    const id = uuidv7();
+    const created_at = new Date().toISOString();
+
+    const profile = {
+      id,
+      name: name.trim(),
+      gender,
+      gender_probability,
+      sample_size,
+      age,
+      age_group,
+      country_id,
+      country_probability,
+      created_at,
+    };
+
+    // Insérer dans Supabase
+    const { data, error: insertError } = await supabase
+      .from("profiles")
+      .insert([profile])
+      .select();
+
+    if (insertError) {
+      throw insertError;
+    }
+
+    return res.status(201).json({
       status: "success",
-      data: {
-        name,
-        gender,
-        probability,
-        sample_size,
-        is_confident,
-        processed_at,
-      },
+      data: data[0],
     });
   } catch (error) {
     console.error("ERROR:", error.message);
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+});
 
+// GET /api/profiles/{id}
+app.get("/api/profiles/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return res.status(404).json({
+          status: "error",
+          message: "Profile not found",
+        });
+      }
+      throw error;
+    }
+
+    return res.status(200).json({
+      status: "success",
+      data,
+    });
+  } catch (error) {
+    console.error("ERROR:", error.message);
     return res.status(500).json({
       status: "error",
       message: error.message,
