@@ -582,7 +582,7 @@ app.all("/auth/github/callback", async (req, res) => {
     }
     const tokenPair = issueTokenPair(user);
 
-    if (saved.mode === "cli" || req.accepts("json") === "json") {
+    if (saved.mode === "cli") {
       return res.json({ status: "success", data: { user, ...tokenPair } });
     }
 
