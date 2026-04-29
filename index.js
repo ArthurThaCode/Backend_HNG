@@ -218,14 +218,21 @@ async function createOrUpdateUserFromGithub(githubUser, githubToken) {
 
 function issueTokenPair(user) {
   const sessionId = crypto.randomUUID();
-  const accessToken = signJwt(
-    { sub: String(user.id), login: user.login, name: user.name, avatar_url: user.avatar_url, role: user.role },
-    ACCESS_TOKEN_TTL_SECONDS
-  );
+  const payload = {
+    sub: String(user.id),
+    id: String(user.id),
+    github_id: String(user.github_id),
+    login: user.login || user.username,
+    username: user.username || user.login,
+    name: user.name || user.username || user.login,
+    avatar_url: user.avatar_url,
+    role: user.role,
+  };
+  const accessToken = signJwt(payload, ACCESS_TOKEN_TTL_SECONDS);
   const refreshToken = crypto.randomBytes(48).toString("base64url");
   refreshSessions.set(hashToken(refreshToken), {
     sessionId,
-    user,
+    user: payload,
     expiresAt: Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000,
   });
   return { accessToken, refreshToken, expiresIn: ACCESS_TOKEN_TTL_SECONDS };
@@ -537,7 +544,7 @@ app.all("/auth/github/callback", async (req, res) => {
 
   if (code === "test_code" || code === "admin_test_code") {
     const mockRole = code === "admin_test_code" ? "admin" : "analyst";
-    const userObj = {
+    const user = {
       id: uuidv7(),
       github_id: "test_" + crypto.randomBytes(4).toString("hex"),
       username: "testuser_" + Date.now(),
@@ -549,9 +556,6 @@ app.all("/auth/github/callback", async (req, res) => {
       created_at: new Date().toISOString(),
     };
     try {
-      const { data, error } = await supabase.from("users").insert([userObj]).select(USER_COLUMNS).single();
-      if (error) throw error;
-      const user = mapDbUser(data);
       const tokenPair = issueTokenPair(user);
       sendTokenCookies(res, tokenPair);
       return res.json({ 
@@ -633,7 +637,8 @@ app.all("/auth/github/callback", async (req, res) => {
   }
 });
 
-app.post("/auth/refresh", (req, res) => {
+app.all("/auth/refresh", (req, res) => {
+  if (req.method !== "POST") return res.status(405).json({ status: "error", message: "Method Not Allowed" });
   const cookies = parseCookies(req);
   const refreshToken = req.body.refresh_token || cookies.insighta_refresh;
   if (!refreshToken) return res.status(400).json({ status: "error", message: "refresh_token required" });
@@ -656,7 +661,8 @@ app.post("/auth/refresh", (req, res) => {
   return res.json(response);
 });
 
-app.post("/auth/logout", (req, res) => {
+app.all("/auth/logout", (req, res) => {
+  if (req.method !== "POST") return res.status(405).json({ status: "error", message: "Method Not Allowed" });
   const cookies = parseCookies(req);
   const refreshToken = req.body.refresh_token || cookies.insighta_refresh;
   if (!refreshToken) return res.status(400).json({ status: "error", message: "refresh_token required" });
