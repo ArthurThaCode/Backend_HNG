@@ -1,15 +1,12 @@
-{
-  "name": "backend",
+﻿{
+  "name": "insighta-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Insighta Labs+ secure profile intelligence backend",
   "main": "index.js",
-  "bin": {
-    "insighta": "./bin/insighta.js"
-  },
   "scripts": {
     "start": "node index.js",
     "seed": "node seed.js",
-    "check": "node --check index.js && node --check bin/insighta.js"
+    "check": "node --check index.js"
   },
   "keywords": [],
   "author": "",

@@ -1,4 +1,4 @@
-# Insighta Labs+ Backend
+﻿# Insighta Labs+ Backend
 
 Secure Profile Intelligence API for Stage 3. The Stage 2 profile features are still available, now behind GitHub OAuth, short-lived access tokens, refresh sessions, role-based access control, API versioning, CSV export, rate limiting, request logging, a web portal, and a globally installable CLI.
 
@@ -9,8 +9,8 @@ Secure Profile Intelligence API for Stage 3. The Stage 2 profile features are st
 - **Auth provider:** GitHub OAuth with PKCE
 - **Interfaces:** shared backend for REST API, browser portal, and CLI
 - **Versioned API:** primary routes live under `/api/v1`; `/api` remains as a compatibility mount
-- **Portal:** static app served from `/portal`
-- **CLI:** `insighta`, configured through `package.json#bin`
+- **Portal:** separate `Insighta-web` static repository calling this backend
+- **CLI:** separate `Insighta-cli` repository using this backend
 
 ## Setup
 
@@ -27,7 +27,8 @@ JWT_SECRET=replace-with-a-long-random-secret
 GITHUB_CLIENT_ID=your-github-oauth-app-client-id
 GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
 GITHUB_REDIRECT_URI=http://localhost:3000/auth/github/callback
-WEB_ORIGIN=http://localhost:3000
+WEB_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:5173
 INSIGHTA_ADMIN_LOGINS=your-github-username
 DEFAULT_ROLE=analyst
 PORT=3000
@@ -40,11 +41,7 @@ npm run seed
 npm start
 ```
 
-Open the web portal at:
-
-```text
-http://localhost:3000/portal
-```
+Run or deploy the separate `Insighta-web` repository, then point it to this backend URL.
 
 ## Auth Flow
 
@@ -145,7 +142,7 @@ The export endpoint accepts the same filters and sorting parameters as `GET /api
 
 ## CLI Usage
 
-Install globally from this repository:
+Install globally from the separate `Insighta-cli` repository:
 
 ```bash
 npm link
@@ -229,3 +226,4 @@ Run `/submit` in `stage-3-backend` and provide:
 - Web portal repository URL
 - Live backend URL
 - Live web portal URL
+

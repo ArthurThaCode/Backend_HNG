@@ -1,10 +1,9 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 
 const crypto = require("crypto");
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
-const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 const { v7: uuidv7 } = require("uuid");
 const { parseNaturalLanguageQuery } = require("./src/services/nlpParser");
@@ -40,7 +39,6 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(express.static(path.join(__dirname, "public")));
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -130,7 +128,7 @@ function cookieOptions({ httpOnly = true, maxAgeSeconds = 900 } = {}) {
   return {
     httpOnly,
     secure,
-    sameSite: "lax",
+    sameSite: secure ? "none" : "lax",
     maxAge: maxAgeSeconds * 1000,
     path: "/",
   };
@@ -493,7 +491,7 @@ app.all("/auth/github/callback", async (req, res) => {
     }
 
     sendTokenCookies(res, tokenPair);
-    return res.redirect("/portal");
+    return res.redirect(WEB_ORIGIN);
   } catch (error) {
     console.error("OAuth callback error:", error.response ? error.response.data : error.message);
     return res.status(502).json({ status: "error", message: "GitHub OAuth request failed" });
@@ -525,9 +523,6 @@ app.post("/auth/logout", (req, res) => {
   return res.status(204).send();
 });
 
-app.get("/portal", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
 
 const api = express.Router();
 api.use(authenticate);
@@ -780,3 +775,4 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
