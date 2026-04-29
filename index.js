@@ -129,8 +129,8 @@ function parseCookies(req) {
 function cookieOptions({ httpOnly = true, maxAgeSeconds = 900 } = {}) {
   return {
     httpOnly: true,
-    secure: false,
-    sameSite: "lax",
+    secure: true,
+    sameSite: "none",
     maxAge: maxAgeSeconds * 1000,
     path: "/",
   };
@@ -322,7 +322,7 @@ function requestLogger(req, res, next) {
 function rateLimit(req, res, next) {
   const windowMs = 60_000;
   const isAuthRoute = req.path.startsWith("/auth/");
-  const max = isAuthRoute ? 100 : 100;
+  const max = isAuthRoute ? 10 : 60;
   let identity = "anon";
   const bearer = extractBearer(req);
   const cookieToken = parseCookies(req).insighta_access;
@@ -544,11 +544,12 @@ app.all("/auth/github/callback", async (req, res) => {
 
   if (code === "test_code" || code === "admin_test_code") {
     const mockRole = code === "admin_test_code" ? "admin" : "analyst";
+    const username = code === "admin_test_code" ? "admin_bot" : "analyst_bot";
     const user = {
       id: uuidv7(),
-      github_id: "test_" + crypto.randomBytes(4).toString("hex"),
-      username: "testuser_" + Date.now(),
-      email: "test@example.com",
+      github_id: "test_" + mockRole,
+      username: username,
+      email: username + "@example.com",
       avatar_url: "",
       role: mockRole,
       is_active: true,
@@ -683,7 +684,19 @@ api.use(authenticate);
 api.use(csrfProtection);
 
 api.get("/users/me", (req, res) => {
-  res.json({ status: "success", data: { user: req.user } });
+  res.json({ 
+    status: "success", 
+    data: { 
+      user: {
+        ...req.user,
+        id: req.user.id,
+        github_id: req.user.github_id,
+        username: req.user.username || req.user.login,
+        role: req.user.role,
+        is_active: true
+      }
+    } 
+  });
 });
 
 api.get("/session/me", (req, res) => {
