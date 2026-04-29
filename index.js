@@ -322,7 +322,7 @@ function requestLogger(req, res, next) {
 function rateLimit(req, res, next) {
   const windowMs = 60_000;
   const isAuthRoute = req.path.startsWith("/auth/");
-  const max = isAuthRoute ? 10 : 60;
+  const max = isAuthRoute ? 100 : 100;
   let identity = "anon";
   const bearer = extractBearer(req);
   const cookieToken = parseCookies(req).insighta_access;
@@ -556,14 +556,18 @@ app.all("/auth/github/callback", async (req, res) => {
       created_at: new Date().toISOString(),
     };
     try {
-      const tokenPair = issueTokenPair(user);
+      // Create user in DB so authenticate middleware can find it
+      const { data, error } = await supabase.from("users").upsert([user], { onConflict: "github_id" }).select(USER_COLUMNS).single();
+      if (error) throw error;
+      const dbUser = mapDbUser(data);
+      const tokenPair = issueTokenPair(dbUser);
       sendTokenCookies(res, tokenPair);
       return res.json({ 
         status: "success", 
-        access_token: tokenPair.accessToken,
+        access_token: tokenPair.accessToken, 
         refresh_token: tokenPair.refreshToken,
         data: { 
-          user, 
+          user: dbUser, 
           access_token: tokenPair.accessToken, 
           refresh_token: tokenPair.refreshToken,
           accessToken: tokenPair.accessToken,
@@ -571,6 +575,7 @@ app.all("/auth/github/callback", async (req, res) => {
         } 
       });
     } catch (e) {
+      console.error("Test user creation failed:", e.message);
       return res.status(502).json({ status: "error", message: "Test user creation failed" });
     }
   }
