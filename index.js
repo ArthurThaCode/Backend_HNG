@@ -113,6 +113,21 @@ function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function toCsv(rows) {
+  const headers = ["id", "name", "gender", "gender_probability", "age", "age_group", "country_id", "country_name", "country_probability", "created_at"];
+  const lines = [headers.join(",")];
+  for (const row of rows) {
+    const values = headers.map(h => {
+      const val = row[h];
+      if (val === null || val === undefined) return "";
+      const str = String(val).replace(/"/g, '""');
+      return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str}"` : str;
+    });
+    lines.push(values.join(","));
+  }
+  return lines.join("\n");
+}
+
 function parseCookies(req) {
   return Object.fromEntries(
     String(req.headers.cookie || "")
@@ -241,10 +256,10 @@ function issueTokenPair(user) {
 function sendTokenCookies(res, tokenPair) {
   const csrfToken = crypto.randomBytes(24).toString("base64url");
   
-  // Using lowercase 'httponly' and 'secure' to satisfy buggy bot regex
-  res.append("Set-Cookie", `insighta_access=${tokenPair.accessToken}; Path=/; Max-Age=${tokenPair.expiresIn}; httponly; secure; SameSite=Lax`);
-  res.append("Set-Cookie", `insighta_refresh=${tokenPair.refreshToken}; Path=/; Max-Age=${REFRESH_TOKEN_TTL_SECONDS}; httponly; secure; SameSite=Lax`);
-  res.append("Set-Cookie", `insighta_csrf=${csrfToken}; Path=/; Max-Age=${REFRESH_TOKEN_TTL_SECONDS}; httponly; secure; SameSite=Lax`);
+  // Standard capitalization for cookies
+  res.append("Set-Cookie", `insighta_access=${tokenPair.accessToken}; Path=/; Max-Age=${tokenPair.expiresIn}; HttpOnly; Secure; SameSite=Lax`);
+  res.append("Set-Cookie", `insighta_refresh=${tokenPair.refreshToken}; Path=/; Max-Age=${REFRESH_TOKEN_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax`);
+  res.append("Set-Cookie", `insighta_csrf=${csrfToken}; Path=/; Max-Age=${REFRESH_TOKEN_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax`);
   
   return csrfToken;
 }
@@ -322,7 +337,7 @@ function rateLimit(req, res, next) {
   const windowMs = 60_000;
   const isAuthRoute = req.path.startsWith("/auth/");
   // Give the bot a bit of slack (15 instead of 10) to avoid crashing its script
-  const max = 100; // Force 100 to avoid bot crash, sacrifice 2 pts for 45 pts total
+  const max = isAuthRoute ? 10 : 60;
   let identity = "anon";
   const bearer = extractBearer(req);
   const cookies = parseCookies(req);
@@ -535,8 +550,8 @@ function startGithubAuth(req, res) {
     });
   }
 
-  res.append("Set-Cookie", `insighta_pkce_state=${state}; Path=/; Max-Age=600; httponly; secure; SameSite=Lax`);
-  res.append("Set-Cookie", `insighta_pkce_verifier=${verifier}; Path=/; Max-Age=600; httponly; secure; SameSite=Lax`);
+  res.append("Set-Cookie", `insighta_pkce_state=${state}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`);
+  res.append("Set-Cookie", `insighta_pkce_verifier=${verifier}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`);
   return res.redirect(authorizeUrl.toString());
 }
 
