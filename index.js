@@ -158,16 +158,17 @@ function determineRole(githubUser) {
 }
 
 function mapDbUser(row) {
+  if (!row) return null;
   return {
-    id: row.id,
-    github_id: row.github_id,
-    login: row.username,
-    username: row.username,
-    name: row.username,
-    email: row.email,
-    avatar_url: row.avatar_url,
-    role: row.role,
-    is_active: row.is_active,
+    id: String(row.id || ""),
+    github_id: String(row.github_id || ""),
+    login: String(row.username || ""),
+    username: String(row.username || ""),
+    name: String(row.username || ""),
+    email: String(row.email || ""),
+    avatar_url: String(row.avatar_url || ""),
+    role: String(row.role || "analyst"),
+    is_active: row.is_active !== false,
   };
 }
 
@@ -255,11 +256,12 @@ function issueTokenPair(user) {
 
 function sendTokenCookies(res, tokenPair) {
   const csrfToken = crypto.randomBytes(24).toString("base64url");
+  const opts = cookieOptions({ maxAgeSeconds: REFRESH_TOKEN_TTL_SECONDS });
+  const accessOpts = cookieOptions({ maxAgeSeconds: tokenPair.expiresIn });
   
-  // Standard capitalization for cookies
-  res.append("Set-Cookie", `insighta_access=${tokenPair.accessToken}; Path=/; Max-Age=${tokenPair.expiresIn}; HttpOnly; Secure; SameSite=Lax`);
-  res.append("Set-Cookie", `insighta_refresh=${tokenPair.refreshToken}; Path=/; Max-Age=${REFRESH_TOKEN_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax`);
-  res.append("Set-Cookie", `insighta_csrf=${csrfToken}; Path=/; Max-Age=${REFRESH_TOKEN_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax`);
+  res.cookie("insighta_access", tokenPair.accessToken, accessOpts);
+  res.cookie("insighta_refresh", tokenPair.refreshToken, opts);
+  res.cookie("insighta_csrf", csrfToken, opts);
   
   return csrfToken;
 }
@@ -335,8 +337,7 @@ function requestLogger(req, res, next) {
 
 function rateLimit(req, res, next) {
   const windowMs = 60_000;
-  const isAuthRoute = req.path.startsWith("/auth/");
-  // Give the bot a bit of slack (15 instead of 10) to avoid crashing its script
+  const isAuthRoute = req.originalUrl.startsWith("/auth/");
   const max = isAuthRoute ? 10 : 60;
   let identity = "anon";
   const bearer = extractBearer(req);
@@ -550,8 +551,8 @@ function startGithubAuth(req, res) {
     });
   }
 
-  res.append("Set-Cookie", `insighta_pkce_state=${state}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`);
-  res.append("Set-Cookie", `insighta_pkce_verifier=${verifier}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`);
+  res.cookie("insighta_pkce_state", state, cookieOptions({ maxAgeSeconds: 600 }));
+  res.cookie("insighta_pkce_verifier", verifier, cookieOptions({ maxAgeSeconds: 600 }));
   return res.redirect(authorizeUrl.toString());
 }
 
